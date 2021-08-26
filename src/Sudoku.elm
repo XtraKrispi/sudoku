@@ -3,7 +3,15 @@ module Sudoku exposing (..)
 import Dict exposing (Dict)
 import List.Extra as ListE
 import Maybe.Extra as Maybe
-import Set
+import Set exposing (Set)
+
+
+type alias CornerPencilMark =
+    Int
+
+
+type alias CenterPencilMark =
+    Int
 
 
 type alias Coord =
@@ -18,7 +26,7 @@ type alias Definition =
 
 
 type Cell
-    = EmptyCell
+    = EmptyCell (Set CornerPencilMark) (Set CenterPencilMark)
     | FilledCell Int
     | GivenCell Int
 
@@ -35,7 +43,7 @@ type ValidationStatus
 initialGrid : Grid
 initialGrid =
     allCoords
-        |> List.map (\coord -> ( coord, EmptyCell ))
+        |> List.map (\coord -> ( coord, EmptyCell Set.empty Set.empty ))
         |> Dict.fromList
 
 
@@ -58,6 +66,31 @@ allCoords =
                 List.range 0 8
                     |> List.map (\y -> ( x, y ))
             )
+
+
+getCellsInRegion : Coord -> List Coord
+getCellsInRegion coord =
+    List.range 0 8
+        |> List.map coordsInRegion
+        |> List.filter (List.member coord)
+        |> List.concat
+
+
+getCellsInColumn : Int -> List Coord
+getCellsInColumn col =
+    allCoords |> List.filter (\( _, col_ ) -> col_ == col)
+
+
+getCellsInRow : Int -> List Coord
+getCellsInRow row =
+    allCoords |> List.filter (\( row_, _ ) -> row_ == row)
+
+
+affectedCells : Coord -> Set Coord
+affectedCells (( row, col ) as coord) =
+    [ [ coord ], getCellsInColumn col, getCellsInRow row, getCellsInRegion coord ]
+        |> List.concat
+        |> Set.fromList
 
 
 coordsInRegion : Int -> List Coord
@@ -99,7 +132,7 @@ validate_ filter g =
 
         getDigit c =
             case c of
-                EmptyCell ->
+                EmptyCell _ _ ->
                     Nothing
 
                 GivenCell i ->

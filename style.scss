@@ -32,6 +32,10 @@
       }
     }
 
+    &.highlighted {
+      background-color: rgba(254, 191, 191, 0.482);
+    }
+
     &.selected .selection-border {
       border: 5px solid rgba(255, 100, 100, 0.5);
     }

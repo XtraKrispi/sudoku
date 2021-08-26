@@ -7,8 +7,9 @@ import Html exposing (div, span, text)
 import Html.Attributes exposing (class, classList)
 import Html.Events exposing (onClick)
 import Json.Decode as Decode
+import List.Extra as ListE
 import Set exposing (Set)
-import Sudoku exposing (Cell(..), Coord, Definition, Grid, allCoords, define, initialGrid)
+import Sudoku exposing (Cell(..), Coord, Definition, Grid, affectedCells, define)
 
 
 type alias Model =
@@ -27,7 +28,12 @@ type Msg
 
 main : Program (List Definition) Model Msg
 main =
-    Browser.element { init = init, view = view, update = update, subscriptions = subscriptions }
+    Browser.element
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
+        }
 
 
 init : List Definition -> ( Model, Cmd Msg )
@@ -105,7 +111,7 @@ update msg model =
                                 Dict.update a
                                     (mNum
                                         |> Maybe.map FilledCell
-                                        |> Maybe.withDefault EmptyCell
+                                        |> Maybe.withDefault (EmptyCell Set.empty Set.empty)
                                         |> Just
                                         |> always
                                     )
@@ -153,18 +159,32 @@ view model =
         isSelected coord =
             Set.member coord model.selected
 
+        isHighlighted coord =
+            model.selected
+                |> Set.toList
+                |> ListE.andThen (Set.toList << affectedCells)
+                |> List.member coord
+
         cellContents c =
             div [ class "selection-border" ]
-                (case c of
-                    EmptyCell ->
-                        []
+                [ div []
+                    (case c of
+                        EmptyCell corners centers ->
+                            [ corners
+                                |> Set.toList
+                                |> List.map (\num -> text (String.fromInt num))
+                                |> div
+                                    [ class "corner-pencil-marks" ]
+                            , div [ class "center-pencil-marks" ] []
+                            ]
 
-                    GivenCell i ->
-                        [ span [ class "given" ] [ text <| String.fromInt i ] ]
+                        GivenCell i ->
+                            [ span [ class "given" ] [ text <| String.fromInt i ] ]
 
-                    FilledCell i ->
-                        [ span [] [ text <| String.fromInt i ] ]
-                )
+                        FilledCell i ->
+                            [ span [] [ text <| String.fromInt i ] ]
+                    )
+                ]
 
         borderClass row col =
             let
@@ -204,6 +224,7 @@ view model =
                                 , ( "col-" ++ String.fromInt col, True )
                                 , ( borderClass row col, borderClass row col /= "" )
                                 , ( "selected", isSelected coord )
+                                , ( "highlighted", isHighlighted coord )
                                 ]
                             , onClick <| ToggleCell coord
                             ]
