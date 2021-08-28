@@ -32,7 +32,14 @@ type Cell
 
 
 type alias Grid =
-    Dict Coord Cell
+    { grid : Dict Coord Cell
+    , regions : List (List Coord)
+    }
+
+
+mapGrid : (Dict Coord Cell -> Dict Coord Cell) -> Grid -> Grid
+mapGrid fn g =
+    { g | grid = fn g.grid }
 
 
 type ValidationStatus
@@ -42,9 +49,107 @@ type ValidationStatus
 
 initialGrid : Grid
 initialGrid =
-    allCoords
-        |> List.map (\coord -> ( coord, EmptyCell Set.empty Set.empty ))
-        |> Dict.fromList
+    { grid =
+        allCoords
+            |> List.map (\coord -> ( coord, EmptyCell Set.empty Set.empty ))
+            |> Dict.fromList
+    , regions = defaultRegions
+    }
+
+
+defaultRegions : List (List Coord)
+defaultRegions =
+    [ [ ( 0, 0 )
+      , ( 0, 1 )
+      , ( 0, 2 )
+      , ( 1, 0 )
+      , ( 1, 1 )
+      , ( 1, 2 )
+      , ( 2, 0 )
+      , ( 2, 1 )
+      , ( 2, 2 )
+      ]
+    , [ ( 0, 3 )
+      , ( 0, 4 )
+      , ( 0, 5 )
+      , ( 1, 3 )
+      , ( 1, 4 )
+      , ( 1, 5 )
+      , ( 2, 3 )
+      , ( 2, 4 )
+      , ( 2, 5 )
+      ]
+    , [ ( 0, 6 )
+      , ( 0, 7 )
+      , ( 0, 8 )
+      , ( 1, 6 )
+      , ( 1, 7 )
+      , ( 1, 8 )
+      , ( 2, 6 )
+      , ( 2, 7 )
+      , ( 2, 8 )
+      ]
+    , [ ( 3, 0 )
+      , ( 3, 1 )
+      , ( 3, 2 )
+      , ( 4, 0 )
+      , ( 4, 1 )
+      , ( 4, 2 )
+      , ( 5, 0 )
+      , ( 5, 1 )
+      , ( 5, 2 )
+      ]
+    , [ ( 3, 3 )
+      , ( 3, 4 )
+      , ( 3, 5 )
+      , ( 4, 3 )
+      , ( 4, 4 )
+      , ( 4, 5 )
+      , ( 5, 3 )
+      , ( 5, 4 )
+      , ( 5, 5 )
+      ]
+    , [ ( 3, 6 )
+      , ( 3, 7 )
+      , ( 3, 8 )
+      , ( 4, 6 )
+      , ( 4, 7 )
+      , ( 4, 8 )
+      , ( 5, 6 )
+      , ( 5, 7 )
+      , ( 5, 8 )
+      ]
+    , [ ( 6, 0 )
+      , ( 6, 1 )
+      , ( 6, 2 )
+      , ( 7, 0 )
+      , ( 7, 1 )
+      , ( 7, 2 )
+      , ( 8, 0 )
+      , ( 8, 1 )
+      , ( 8, 2 )
+      ]
+    , [ ( 6, 3 )
+      , ( 6, 4 )
+      , ( 6, 5 )
+      , ( 7, 3 )
+      , ( 7, 4 )
+      , ( 7, 5 )
+      , ( 8, 3 )
+      , ( 8, 4 )
+      , ( 8, 5 )
+      ]
+    , [ ( 6, 6 )
+      , ( 6, 7 )
+      , ( 6, 8 )
+      , ( 7, 6 )
+      , ( 7, 7 )
+      , ( 7, 8 )
+      , ( 8, 6 )
+      , ( 8, 7 )
+      , ( 8, 8 )
+      ]
+    ]
 
 
 define : List Definition -> Grid
@@ -55,7 +160,7 @@ define defns =
                 |> List.map (\{ row, col, value } -> ( ( row, col ), GivenCell value ))
                 |> Dict.fromList
     in
-    Dict.union defnGrid initialGrid
+    mapGrid (Dict.union defnGrid) initialGrid
 
 
 allCoords : List Coord
@@ -68,10 +173,9 @@ allCoords =
             )
 
 
-getCellsInRegion : Coord -> List Coord
-getCellsInRegion coord =
-    List.range 0 8
-        |> List.map coordsInRegion
+getCellsInRegion : List (List Coord) -> Coord -> List Coord
+getCellsInRegion regions coord =
+    regions
         |> List.filter (List.member coord)
         |> List.concat
 
@@ -86,9 +190,9 @@ getCellsInRow row =
     allCoords |> List.filter (\( row_, _ ) -> row_ == row)
 
 
-affectedCells : Coord -> Set Coord
-affectedCells (( row, col ) as coord) =
-    [ [ coord ], getCellsInColumn col, getCellsInRow row, getCellsInRegion coord ]
+affectedCells : List (List Coord) -> Coord -> Set Coord
+affectedCells regions (( row, col ) as coord) =
+    [ [ coord ], getCellsInColumn col, getCellsInRow row, getCellsInRegion regions coord ]
         |> List.concat
         |> Set.fromList
 
@@ -123,7 +227,7 @@ validate_ filter g =
                 |> Set.fromList
                 |> Set.toList
                 |> (\ns_ ->
-                        if List.length ns_ /= List.length ns then
+                        if List.length ns_ /= 9 then
                             Invalid
 
                         else
@@ -143,7 +247,7 @@ validate_ filter g =
     in
     allCoords
         |> List.filter filter
-        |> List.map (\coord -> Dict.get coord g)
+        |> List.map (\coord -> Dict.get coord g.grid)
         |> List.map (Maybe.andThen getDigit)
         |> Maybe.values
         |> validateValues
@@ -161,8 +265,8 @@ validate g =
                 |> List.map (\c -> validate_ (\( _, col ) -> col == c) g)
 
         regionResults =
-            List.range 0 8
-                |> List.map (\r -> validate_ (\coord -> List.member coord (coordsInRegion r)) g)
+            g.regions
+                |> List.map (\r -> validate_ (\coord -> List.member coord r) g)
     in
     [ rowResults, colResults, regionResults ]
         |> List.concat
